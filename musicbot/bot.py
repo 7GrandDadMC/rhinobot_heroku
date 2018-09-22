@@ -75,7 +75,6 @@ class MusicBot(discord.Client):
 
         self.blacklist = set(load_file(self.config.blacklist_file))
         self.autoplaylist = load_file(self.config.auto_playlist_file)
-        self.song_list = list(set(self.autoplaylist))
 
         self.aiolocks = defaultdict(asyncio.Lock)
         self.downloader = downloader.Downloader(download_folder='audio_cache')
@@ -679,23 +678,11 @@ class MusicBot(discord.Client):
                 else:
                     log.debug("No content in current autoplaylist. Filling with new music...")
                     player.autoplaylist = list(set(self.autoplaylist))
-                    player.song_list = list(set(self.song_list))
 
             while player.autoplaylist:
                 if self.config.auto_playlist_random:
-                    player.song_list = self.song_list
                     random.shuffle(player.autoplaylist)
                     song_url = random.choice(player.autoplaylist)
-                    random.shuffle(player.song_list)
-                    if (len(player.song_list) == 0):
-                        log.info('All songs have been played. Restarting auto playlist...') 
-                        self.song_list = list(set(self.autoplaylist))
-                        player.song_list = self.song_list
-                        random.shuffle(player.autoplaylist)
-                        song_url = random.choice(player.autoplaylist)
-                        random.shuffle(player.song_list)
-                    song_url = random.choice(player.song_list)
-                    self.song_list.remove(song_url)
                 else:
                     song_url = player.autoplaylist[0]
                 player.autoplaylist.remove(song_url)
@@ -770,7 +757,7 @@ class MusicBot(discord.Client):
             if self.user.bot:
                 activeplayers = sum(1 for p in self.players.values() if p.is_playing)
                 if activeplayers > 1:
-                    game = discord.Game(type=0, name="%s個の鯖で音楽" % activeplayers)
+                    game = discord.Game(type=0, name="music on %s servers" % activeplayers)
                     entry = None
 
                 elif activeplayers == 1:
@@ -1236,7 +1223,7 @@ class MusicBot(discord.Client):
         """Provides a basic template for embeds"""
         e = discord.Embed()
         e.colour = 7506394
-        e.set_footer(text='Just-Some-Bots/MusicBot ({}) / 日本語化: KabanFriends'.format(BOTVERSION), icon_url='https://i.imgur.com/gFHBoZA.png')
+        e.set_footer(text='Just-Some-Bots/MusicBot ({})'.format(BOTVERSION), icon_url='https://i.imgur.com/gFHBoZA.png')
         e.set_author(name=self.user.name, url='https://github.com/Just-Some-Bots/MusicBot', icon_url=self.user.avatar_url)
         return e
 
@@ -1250,7 +1237,6 @@ class MusicBot(discord.Client):
         player.autoplaylist = list(set(self.autoplaylist))
         return Response(self.str.get('cmd-resetplaylist-response', '\N{OK HAND SIGN}'), delete_after=15)
 
-    
     async def cmd_help(self, message, channel, command=None):
         """
         Usage:
@@ -1458,6 +1444,9 @@ class MusicBot(discord.Client):
         matches = re.search(playlistRegex, song_url)
         groups = matches.groups() if matches is not None else []
         song_url = "https://www.youtube.com/playlist?" + groups[0] if len(groups) > 0 else song_url
+
+        if (song_url.startswith('https://open.spotify.com/track/')):
+            song_url = song_url.replace("https://open.spotify.com/track/", "spotify:track:")
 
         if song_url.startswith('spotify:'):  # treat it as probably a spotify URI
             if self.config._spotify:
@@ -2618,8 +2607,8 @@ class MusicBot(discord.Client):
         return Response("Disconnected from `{0.name}`".format(server), delete_after=20)
 
     async def cmd_restart(self, channel):
-        await self.safe_send_message(channel, "\N{WAVING HAND SIGN} 再起動しています！"
-            "")
+        await self.safe_send_message(channel, "\N{WAVING HAND SIGN} Restarting. If you have updated your bot "
+            "or its dependencies, you need to restart the bot properly, rather than using this command.")
 
         player = self.get_player_in(channel.server)
         if player and player.is_paused:
@@ -2629,7 +2618,7 @@ class MusicBot(discord.Client):
         raise exceptions.RestartSignal()
 
     async def cmd_shutdown(self, channel):
-        await self.safe_send_message(channel, "\N{WAVING HAND SIGN} 音楽BOTの機能を停止しました。")
+        await self.safe_send_message(channel, "\N{WAVING HAND SIGN}")
         
         player = self.get_player_in(channel.server)
         if player and player.is_paused:
